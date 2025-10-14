@@ -1,0 +1,3 @@
+[submodule "p3/iot-lsemlali"]
+	path = p3/iot-lsemlali
+	url = git@github.com:lahbibsemlali/iot-lsemlali.git
