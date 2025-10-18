@@ -129,6 +129,21 @@ create_namespaces() {
     kubectl get namespaces
 }
 
+# Install Argo CD
+install_argocd() {
+    print_status "Installing Argo CD in argocd namespace..."
+    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+    
+    print_status "Waiting for Argo CD to be ready (this may take 1-2 minutes)..."
+    kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd 2>/dev/null || true
+    
+    sleep 10
+    
+    print_status "Argo CD installed successfully"
+    print_status "Argo CD components:"
+    kubectl get pods -n argocd
+}
+
 # Print summary
 print_summary() {
     echo ""
@@ -143,7 +158,22 @@ print_summary() {
     print_status "Namespaces:"
     kubectl get namespaces
     echo ""
-    print_status "Your K3d cluster is ready for configuration!"
+    print_status "Argo CD Status:"
+    kubectl get pods -n argocd
+    echo ""
+    print_status "Your K3d cluster with Argo CD is ready!"
+    echo ""
+    echo -e "${YELLOW}Next steps:${NC}"
+    echo "1. Create your configuration files (deployment.yaml, argocd-application.yaml) in ../confs/"
+    echo "2. Create a GitHub repository with your k8s manifests"
+    echo "3. Update argocd-application.yaml with your GitHub repository URL"
+    echo "4. Apply the configurations: kubectl apply -f ../confs/argocd-application.yaml"
+    echo ""
+    echo -e "${YELLOW}Useful commands:${NC}"
+    echo "kubectl get ns                          # List namespaces"
+    echo "kubectl get pods -n argocd              # Check Argo CD pods"
+    echo "kubectl get pods -n dev                 # Check deployed applications"
+    echo "kubectl get applications -n argocd      # Check Argo CD applications"
     echo ""
 }
 
@@ -151,7 +181,7 @@ print_summary() {
 main() {
     echo -e "${GREEN}"
     echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║              K3d Installation and Setup                   ║"
+    echo "║      K3d Installation and Argo CD Setup                   ║"
     echo "║              Part 3: Inception of Things                  ║"
     echo "╚════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -178,6 +208,10 @@ main() {
     
     print_status "=== Phase 4: Creating Namespaces ==="
     create_namespaces
+    echo ""
+    
+    print_status "=== Phase 5: Installing Argo CD ==="
+    install_argocd
     echo ""
     
     print_summary
