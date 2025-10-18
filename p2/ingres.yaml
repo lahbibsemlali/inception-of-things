@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web  # ← Fixed indentation!
+spec:
+  rules:
+  - host: "app1.com"
+    http:
+      paths:
+        - path: "/"
+          pathType: Prefix
+          backend:
+            service:
+              name: app1-service
+              port:
+                number: 80
+  - host: "app2.com"
+    http:
+      paths:
+        - path: "/"
+          pathType: Prefix
+          backend:
+            service:
+              name: app2-service
+              port:
+                number: 80
+  
+  # Default backend (no host) - catches all other requests
+  - http:
+      paths:
+        - path: "/"
+          pathType: Prefix
+          backend:
+            service:
+              name: app3-service
+              port:
+                number: 80

@@ -1,0 +1,37 @@
+Vagrant.configure("2") do |config|
+
+  # VM 1 - Server
+  config.vm.define "abouzanbS" do |vm1|
+    vm1.vm.box = "ubuntu/jammy64"
+    vm1.vm.hostname = "abouzanbS"
+    vm1.vm.network "private_network", ip: "192.168.56.110"
+    vm1.vm.provider "virtualbox" do |vb|
+      vb.gui = false  # Start without GUI to test
+      vb.memory = "512"
+      vb.cpus = 1
+      vb.name = "abouzanbS"
+    end
+    vm1.vm.provision "shell", inline: <<-SHELL
+      sudo apt update
+      echo "VM1 is ready"
+    SHELL
+  end
+
+  # VM 2 - ServerWorker  
+  config.vm.define "abouzanbSW" do |vm2|
+    vm2.vm.box = "ubuntu/jammy64"
+    vm2.vm.hostname = "abouzanbSW"
+    vm2.vm.network "private_network", ip: "192.168.56.111"
+    vm2.vm.provider "virtualbox" do |vb|
+      vb.gui = false  # Start without GUI to test
+      vb.memory = "512"
+      vb.cpus = 1
+      vb.name = "abouzanbSW"
+    end
+    vm2.vm.provision "shell", inline: <<-SHELL
+      sudo apt update
+      echo "VM2 is ready"
+    SHELL
+  end
+
+end
