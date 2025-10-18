@@ -2,63 +2,186 @@
 
 set -e
 
-echo "🚀 Starting IoT Part 3 Setup..."
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Functions
+print_status() {
+    echo -e "${GREEN}[*]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[!]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[!]${NC} $1"
+}
 
 # Update system
-echo "📦 Updating system..."
-sudo apt-get update
+update_system() {
+    print_status "Updating system packages..."
+    sudo apt-get update
+    sudo apt-get upgrade -y
+}
 
-# Install Docker if not present
-if ! command -v docker &>/dev/null; then
-  echo "🐳 Installing Docker..."
-  curl -fsSL https://get.docker.com -o get-docker.sh
-  sh get-docker.sh
-  sudo usermod -aG docker $USER
-  rm get-docker.sh
-  echo "Docker installed. You may need to log out and back in."
-fi
+# Install Docker
+install_docker() {
+    if ! command -v docker &> /dev/null; then
+        print_status "Installing Docker..."
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sudo sh get-docker.sh
+        sudo usermod -aG docker $USER
+        rm get-docker.sh
+        print_status "Docker installed successfully"
+    else
+        print_status "Docker already installed"
+    fi
+}
 
-# Install kubectl if not present
-if ! command -v kubectl &>/dev/null; then
-  echo "☸️  Installing kubectl..."
-  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-  sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-  rm kubectl
-fi
+# Install kubectl
+install_kubectl() {
+    if ! command -v kubectl &> /dev/null; then
+        print_status "Installing kubectl..."
+        KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+        curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+        sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+        rm kubectl
+        print_status "kubectl installed successfully"
+    else
+        print_status "kubectl already installed"
+    fi
+}
 
-# Install K3d if not present
-if ! command -v k3d &>/dev/null; then
-  echo "🎮 Installing K3d..."
-  curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-fi
+# Install k3d
+install_k3d() {
+    if ! command -v k3d &> /dev/null; then
+        print_status "Installing K3d..."
+        wget -q -O - https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+        print_status "K3d installed successfully"
+    else
+        print_status "K3d already installed"
+    fi
+}
 
-# Install ArgoCD CLI (optional but useful)
-if ! command -v argocd &>/dev/null; then
-  echo "🔄 Installing ArgoCD CLI..."
-  curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-  sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
-  rm argocd-linux-amd64
-fi
+# Install git
+install_git() {
+    if ! command -v git &> /dev/null; then
+        print_status "Installing git..."
+        sudo apt-get install -y git
+        print_status "git installed successfully"
+    else
+        print_status "git already installed"
+    fi
+}
 
-echo "✅ All tools installed!"
-echo ""
-echo "Versions:"
-docker --version
-kubectl version --client --short
-k3d --version
-argocd version --client --short
+# Install curl
+install_curl() {
+    if ! command -v curl &> /dev/null; then
+        print_status "Installing curl..."
+        sudo apt-get install -y curl
+        print_status "curl installed successfully"
+    else
+        print_status "curl already installed"
+    fi
+}
 
-# Create K3d cluster
-echo ""
-echo "🏗️  Creating K3d cluster..."
-k3d cluster create iot-cluster \
-  --port 8080:80@loadbalancer \
-  --port 8888:8888@loadbalancer \
-  --port 8443:443@loadbalancer
+# Create k3d cluster
+create_k3d_cluster() {
+    CLUSTER_NAME="iot-cluster"
+    
+    if k3d cluster list | grep -q $CLUSTER_NAME; then
+        print_warning "Cluster $CLUSTER_NAME already exists, deleting..."
+        k3d cluster delete $CLUSTER_NAME
+        sleep 5
+    fi
+    
+    print_status "Creating K3d cluster: $CLUSTER_NAME"
+    k3d cluster create $CLUSTER_NAME \
+        --servers 1 \
+        --agents 2 \
+        -p "80:80@loadbalancer" \
+        -p "443:443@loadbalancer" \
+        -p "8888:8888@loadbalancer" \
+        --wait
+    
+    print_status "Merging kubeconfig..."
+    k3d kubeconfig merge $CLUSTER_NAME -d -s
+    
+    print_status "Verifying cluster setup..."
+    kubectl cluster-info
+    print_status "Cluster nodes:"
+    kubectl get nodes
+}
 
-# Wait for cluster to be ready
-echo "⏳ Waiting for cluster to be ready..."
-kubectl wait --for=condition=Ready nodes --all --timeout=60s
+# Create namespaces
+create_namespaces() {
+    print_status "Creating argocd namespace..."
+    kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+    
+    print_status "Creating dev namespace..."
+    kubectl create namespace dev --dry-run=client -o yaml | kubectl apply -f -
+    
+    print_status "Namespaces created:"
+    kubectl get namespaces
+}
 
-echo "✅ Cluster created successfully!"
-kubectl get nodes
+# Print summary
+print_summary() {
+    echo ""
+    echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║          Setup Completed Successfully!                     ║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    print_status "Cluster Name: iot-cluster"
+    print_status "Cluster Status:"
+    kubectl get nodes
+    echo ""
+    print_status "Namespaces:"
+    kubectl get namespaces
+    echo ""
+    print_status "Your K3d cluster is ready for configuration!"
+    echo ""
+}
+
+# Main execution
+main() {
+    echo -e "${GREEN}"
+    echo "╔════════════════════════════════════════════════════════════╗"
+    echo "║              K3d Installation and Setup                   ║"
+    echo "║              Part 3: Inception of Things                  ║"
+    echo "╚════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+    echo ""
+    
+    print_status "Starting installation and setup..."
+    echo ""
+    
+    print_status "=== Phase 1: System Update ==="
+    update_system
+    echo ""
+    
+    print_status "=== Phase 2: Installing Dependencies ==="
+    install_docker
+    install_kubectl
+    install_k3d
+    install_git
+    install_curl
+    echo ""
+    
+    print_status "=== Phase 3: Creating K3d Cluster ==="
+    create_k3d_cluster
+    echo ""
+    
+    print_status "=== Phase 4: Creating Namespaces ==="
+    create_namespaces
+    echo ""
+    
+    print_summary
+}
+
+# Run main function
+main
