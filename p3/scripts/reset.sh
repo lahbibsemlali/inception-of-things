@@ -144,25 +144,6 @@ clean_kubeconfig() {
     fi
 }
 
-# Clean Helm releases
-clean_helm_releases() {
-    print_status "Removing all Helm releases..."
-    
-    # Get all namespaces
-    NAMESPACES=$(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
-    
-    if [ ! -z "$NAMESPACES" ]; then
-        for ns in $NAMESPACES; do
-            RELEASES=$(helm list -n "$ns" -q 2>/dev/null || echo "")
-            if [ ! -z "$RELEASES" ]; then
-                for release in $RELEASES; do
-                    print_status "Uninstalling Helm release: $release in namespace: $ns"
-                    helm uninstall "$release" -n "$ns" 2>/dev/null || print_warning "Failed to uninstall $release"
-                done
-            fi
-        done
-    fi
-}
 
 # Clean temporary files
 clean_temp_files() {
@@ -269,47 +250,42 @@ main() {
     kill_kubectl_processes
     echo ""
     
-    # Phase 2: Clean Helm releases
-    print_status "=== Phase 2: Cleaning Helm Releases ==="
-    clean_helm_releases
-    echo ""
-    
-    # Phase 3: Delete clusters
+    # Phase 4: Delete clusters
     print_status "=== Phase 3: Deleting K3d Clusters ==="
     delete_all_k3d_clusters
     echo ""
     
-    # Phase 4: Clean containers
+    # Phase 5: Clean containers
     print_status "=== Phase 4: Cleaning Docker Containers ==="
     clean_k3d_containers
     echo ""
     
-    # Phase 5: Clean networks
+    # Phase 6: Clean networks
     print_status "=== Phase 5: Cleaning Docker Networks ==="
     clean_docker_networks
     echo ""
     
-    # Phase 6: Clean volumes
+    # Phase 7: Clean volumes
     print_status "=== Phase 6: Cleaning Docker Volumes ==="
     clean_docker_volumes
     echo ""
     
-    # Phase 7: Clean images
+    # Phase 8: Clean images
     print_status "=== Phase 7: Cleaning Docker Images ==="
     clean_k3d_images
     echo ""
     
-    # Phase 8: Clean kubeconfig
+    # Phase 9: Clean kubeconfig
     print_status "=== Phase 8: Cleaning Kubeconfig ==="
     clean_kubeconfig
     echo ""
     
-    # Phase 9: Clean temp files
+    # Phase 10: Clean temp files
     print_status "=== Phase 9: Cleaning Temporary Files ==="
     clean_temp_files
     echo ""
     
-    # Phase 10: Docker prune
+    # Phase 11: Docker prune
     print_status "=== Phase 10: Pruning Docker System ==="
     prune_docker
     echo ""

@@ -6,7 +6,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/lahbibsemlali/iot-lsemlali
+    repoURL: http://gitlab-webservice-default.gitlab.svc:8181/root/iot-lsemlali.git
+      
     targetRevision: main
     path: manifests
   destination:
@@ -14,7 +15,6 @@ spec:
     namespace: dev
   syncPolicy:
     automated:
-      prune: true
       selfHeal: true
     syncOptions:
     - CreateNamespace=true

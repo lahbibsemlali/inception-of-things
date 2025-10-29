@@ -2,220 +2,88 @@
 
 set -e
 
-# Colors for output
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+RED='\033[0;31m'
+NC='\033[0m'
 
-# Functions
-print_status() {
-    echo -e "${GREEN}[*]${NC} $1"
-}
+CLUSTER_NAME="iot-cluster"
+ARGOCD_APP_FILE="../confs/argocd-application.yaml"
 
-print_error() {
-    echo -e "${RED}[!]${NC} $1"
-}
+echo -e "${GREEN}=== Setting up K3d Cluster with ArgoCD ===${NC}\n"
 
-print_warning() {
-    echo -e "${YELLOW}[!]${NC} $1"
-}
-
-# Update system
-update_system() {
-    print_status "Updating system packages..."
-    sudo apt-get update
-    sudo apt-get upgrade -y
-}
-
-# Install Docker
-install_docker() {
-    if ! command -v docker &> /dev/null; then
-        print_status "Installing Docker..."
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sudo sh get-docker.sh
-        sudo usermod -aG docker $USER
-        rm get-docker.sh
-        print_status "Docker installed successfully"
-    else
-        print_status "Docker already installed"
+# Check prerequisites
+for cmd in docker kubectl k3d; do
+    if ! command -v $cmd &> /dev/null; then
+        echo -e "${RED}Error: $cmd not installed. Run ./01-install-tools.sh first${NC}"
+        exit 1
     fi
-}
+done
 
-# Install kubectl
-install_kubectl() {
-    if ! command -v kubectl &> /dev/null; then
-        print_status "Installing kubectl..."
-        KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
-        curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-        sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-        rm kubectl
-        print_status "kubectl installed successfully"
-    else
-        print_status "kubectl already installed"
-    fi
-}
+# Delete existing cluster if exists
+if k3d cluster list 2>/dev/null | grep -q "$CLUSTER_NAME"; then
+    echo -e "${YELLOW}Deleting existing cluster...${NC}"
+    k3d cluster delete $CLUSTER_NAME
+    sleep 3
+fi
 
-# Install k3d
-install_k3d() {
-    if ! command -v k3d &> /dev/null; then
-        print_status "Installing K3d..."
-        wget -q -O - https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-        print_status "K3d installed successfully"
-    else
-        print_status "K3d already installed"
-    fi
-}
+# Create cluster
+echo -e "${GREEN}[1/6]${NC} Creating cluster: $CLUSTER_NAME"
+k3d cluster create $CLUSTER_NAME \
+    --servers 1 \
+    --agents 2 \
+    -p "8090:80@loadbalancer" \
+    -p "8443:443@loadbalancer" \
+    --wait
 
-# Install git
-install_git() {
-    if ! command -v git &> /dev/null; then
-        print_status "Installing git..."
-        sudo apt-get install -y git
-        print_status "git installed successfully"
-    else
-        print_status "git already installed"
-    fi
-}
-
-# Install curl
-install_curl() {
-    if ! command -v curl &> /dev/null; then
-        print_status "Installing curl..."
-        sudo apt-get install -y curl
-        print_status "curl installed successfully"
-    else
-        print_status "curl already installed"
-    fi
-}
-
-# Create k3d cluster
-create_k3d_cluster() {
-    CLUSTER_NAME="iot-cluster"
-    
-    if k3d cluster list | grep -q $CLUSTER_NAME; then
-        print_warning "Cluster $CLUSTER_NAME already exists, deleting..."
-        k3d cluster delete $CLUSTER_NAME
-        sleep 5
-    fi
-    
-    print_status "Creating K3d cluster: $CLUSTER_NAME"
-    k3d cluster create $CLUSTER_NAME \
-        --servers 1 \
-        --agents 2 \
-        -p "80:80@loadbalancer" \
-        -p "443:443@loadbalancer" \
-        -p "8888:8888@loadbalancer" \
-        --wait
-    
-    print_status "Merging kubeconfig..."
-    k3d kubeconfig merge $CLUSTER_NAME -d -s
-    
-    print_status "Verifying cluster setup..."
-    kubectl cluster-info
-    print_status "Cluster nodes:"
-    kubectl get nodes
-}
+# Wait for nodes
+echo -e "${GREEN}[2/6]${NC} Waiting for nodes..."
+kubectl wait --for=condition=ready nodes --all --timeout=300s
 
 # Create namespaces
-create_namespaces() {
-    print_status "Creating argocd namespace..."
-    kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-    
-    print_status "Creating dev namespace..."
-    kubectl create namespace dev --dry-run=client -o yaml | kubectl apply -f -
-    
-    print_status "Namespaces created:"
-    kubectl get namespaces
-}
+echo -e "${GREEN}[3/6]${NC} Creating namespaces..."
+kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace dev --dry-run=client -o yaml | kubectl apply -f -
 
-# Install Argo CD
-install_argocd() {
-    print_status "Installing Argo CD in argocd namespace..."
-    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-    
-    print_status "Waiting for Argo CD to be ready (this may take 1-2 minutes)..."
-    kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd 2>/dev/null || true
-    
-    sleep 10
-    
-    print_status "Argo CD installed successfully"
-    print_status "Argo CD components:"
-    kubectl get pods -n argocd
-}
+# Install ArgoCD
+echo -e "${GREEN}[4/6]${NC} Installing ArgoCD..."
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-# Print summary
-print_summary() {
-    echo ""
-    echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║          Setup Completed Successfully!                     ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
-    echo ""
-    print_status "Cluster Name: iot-cluster"
-    print_status "Cluster Status:"
-    kubectl get nodes
-    echo ""
-    print_status "Namespaces:"
-    kubectl get namespaces
-    echo ""
-    print_status "Argo CD Status:"
-    kubectl get pods -n argocd
-    echo ""
-    print_status "Your K3d cluster with Argo CD is ready!"
-    echo ""
-    echo -e "${YELLOW}Next steps:${NC}"
-    echo "1. Create your configuration files (deployment.yaml, argocd-application.yaml) in ../confs/"
-    echo "2. Create a GitHub repository with your k8s manifests"
-    echo "3. Update argocd-application.yaml with your GitHub repository URL"
-    echo "4. Apply the configurations: kubectl apply -f ../confs/argocd-application.yaml"
-    echo ""
-    echo -e "${YELLOW}Useful commands:${NC}"
-    echo "kubectl get ns                          # List namespaces"
-    echo "kubectl get pods -n argocd              # Check Argo CD pods"
-    echo "kubectl get pods -n dev                 # Check deployed applications"
-    echo "kubectl get applications -n argocd      # Check Argo CD applications"
-    echo ""
-}
+# Wait for ArgoCD
+echo -e "${GREEN}[5/6]${NC} Waiting for ArgoCD to be ready..."
+kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd 2>/dev/null || sleep 30
 
-# Main execution
-main() {
-    echo -e "${GREEN}"
-    echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║      K3d Installation and Argo CD Setup                   ║"
-    echo "║              Part 3: Inception of Things                  ║"
-    echo "╚════════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-    echo ""
-    
-    print_status "Starting installation and setup..."
-    echo ""
-    
-    print_status "=== Phase 1: System Update ==="
-    update_system
-    echo ""
-    
-    print_status "=== Phase 2: Installing Dependencies ==="
-    install_docker
-    install_kubectl
-    install_k3d
-    install_git
-    install_curl
-    echo ""
-    
-    print_status "=== Phase 3: Creating K3d Cluster ==="
-    create_k3d_cluster
-    echo ""
-    
-    print_status "=== Phase 4: Creating Namespaces ==="
-    create_namespaces
-    echo ""
-    
-    print_status "=== Phase 5: Installing Argo CD ==="
-    install_argocd
-    echo ""
-    
-    print_summary
-}
+# Apply ArgoCD application config
+echo -e "${GREEN}[6/6]${NC} Applying ArgoCD application..."
+if [ -f "$ARGOCD_APP_FILE" ]; then
+    kubectl apply -f "$ARGOCD_APP_FILE"
+    echo -e "${GREEN}✓ ArgoCD application applied${NC}"
+else
+    echo -e "${YELLOW}⚠ File not found: $ARGOCD_APP_FILE${NC}"
+    echo -e "${YELLOW}  You can apply it manually later with:${NC}"
+    echo -e "${YELLOW}  kubectl apply -f $ARGOCD_APP_FILE${NC}"
+fi
 
-# Run main function
-main
+echo -e "\n${GREEN}✓ Setup complete!${NC}\n"
+
+echo -e "${GREEN}Cluster nodes:${NC}"
+kubectl get nodes
+echo ""
+
+echo -e "${GREEN}ArgoCD pods:${NC}"
+kubectl get pods -n argocd
+echo ""
+
+if [ -f "$ARGOCD_APP_FILE" ]; then
+    echo -e "${GREEN}ArgoCD applications:${NC}"
+    kubectl get applications -n argocd
+    echo ""
+fi
+
+echo -e "${YELLOW}Access: http://localhost:8090${NC}"
+echo -e "\n${YELLOW}To access ArgoCD:${NC}"
+echo "  1. Get password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=\"{.data.password}\" | base64 -d"
+echo "  2. Port-forward: kubectl port-forward svc/argocd-server -n argocd 8081:443"
+echo "  3. Open: http://localhost:8081"
+echo "  4. Login: admin / <password>"
+echo -e "\n${YELLOW}Or use: ./manage-cluster.sh (option 5)${NC}\n"
