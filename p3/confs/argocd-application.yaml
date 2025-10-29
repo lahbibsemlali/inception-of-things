@@ -6,8 +6,8 @@ metadata:
 spec:
   project: default
   source:
-    # repoURL: http://gitlab-webservice-default.gitlab.svc:8181/root/iot-lsemlali.git
-    repoURL: https://github.com/lahbibsemlali/iot-lsemlali
+    repoURL: http://gitlab-webservice-default.gitlab.svc:8181/root/iot-lsemlali.git
+    # repoURL: https://github.com/lahbibsemlali/iot-lsemlali
     targetRevision: main
     path: manifests
   destination:
