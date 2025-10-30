@@ -8,7 +8,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 CLUSTER_NAME="iot-cluster"
-ARGOCD_APP_FILE="/home/lahbib-semlali/inception-of-things/confs/argocd-application.yaml"
+ARGOCD_APP_FILE="../confs/argocd-application.yaml"
 
 echo -e "${GREEN}=== Setting up K3d Cluster with ArgoCD ===${NC}\n"
 
