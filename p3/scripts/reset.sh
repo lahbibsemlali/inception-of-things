@@ -209,8 +209,6 @@ print_summary() {
     print_status "Temporary files removed"
     print_status "System is completely clean"
     echo ""
-    print_info "You can now run setup.sh again to start fresh"
-    echo ""
 }
 
 # Main execution

@@ -71,4 +71,3 @@ echo "  1. Get password: kubectl -n argocd get secret argocd-initial-admin-secre
 echo "  2. Port-forward: kubectl port-forward svc/argocd-server -n argocd 8081:443"
 echo "  3. Open: http://localhost:8081"
 echo "  4. Login: admin / <password>"
-echo -e "\n${YELLOW}Or use: ./manage-cluster.sh (option 5)${NC}\n"

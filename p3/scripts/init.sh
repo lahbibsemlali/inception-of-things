@@ -51,4 +51,3 @@ echo -e "${GREEN}[6/6]${NC} Installing curl and wget..."
 sudo apt-get install -y curl wget -qq
 
 echo -e "\n${GREEN}✓ Installation complete!${NC}"
-echo -e "\n${YELLOW}Next: Run ./02-create-cluster.sh${NC}\n"
