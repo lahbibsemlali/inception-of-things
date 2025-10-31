@@ -2,14 +2,12 @@
 
 set -e
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Functions
 print_status() {
     echo -e "${GREEN}[*]${NC} $1"
 }
@@ -26,7 +24,6 @@ print_info() {
     echo -e "${BLUE}[i]${NC} $1"
 }
 
-# Confirmation
 confirm() {
     local prompt="$1"
     local response
@@ -42,7 +39,6 @@ confirm() {
     esac
 }
 
-# Kill all kubectl processes
 kill_kubectl_processes() {
     print_status "Killing all kubectl port-forward processes..."
     pkill -f "kubectl port-forward" 2>/dev/null || print_warning "No kubectl port-forward processes running"
@@ -51,7 +47,6 @@ kill_kubectl_processes() {
     pkill -f "kubectl proxy" 2>/dev/null || print_warning "No kubectl proxy processes running"
 }
 
-# Delete all K3d clusters
 delete_all_k3d_clusters() {
     print_status "Listing all K3d clusters..."
     k3d cluster list
@@ -71,47 +66,37 @@ delete_all_k3d_clusters() {
     sleep 3
 }
 
-# Clean all Docker containers related to K3d
 clean_k3d_containers() {
     print_status "Stopping and removing all K3d containers..."
     
-    # Stop all k3d containers
     docker ps -a | grep k3d | awk '{print $1}' | xargs -r docker stop 2>/dev/null || print_warning "No K3d containers to stop"
     
-    # Remove all k3d containers
     docker ps -a | grep k3d | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || print_warning "No K3d containers to remove"
 }
 
-# Clean all Docker images related to K3d
 clean_k3d_images() {
     print_status "Removing K3d Docker images..."
     
-    # Remove k3d images
     docker images | grep k3d | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || print_warning "No K3d images to remove"
     
-    # Remove k3s images
     docker images | grep k3s | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || print_warning "No K3s images to remove"
 }
 
-# Clean Docker networks
 clean_docker_networks() {
     print_status "Removing K3d Docker networks..."
     
     docker network ls | grep k3d | awk '{print $1}' | xargs -r docker network rm 2>/dev/null || print_warning "No K3d networks to remove"
 }
 
-# Clean Docker volumes
 clean_docker_volumes() {
     print_status "Removing K3d Docker volumes..."
     
     docker volume ls | grep k3d | awk '{print $2}' | xargs -r docker volume rm 2>/dev/null || print_warning "No K3d volumes to remove"
 }
 
-# Clean kubeconfig
 clean_kubeconfig() {
     print_status "Cleaning kubeconfig..."
     
-    # Remove all k3d contexts
     CONTEXTS=$(kubectl config get-contexts -o name 2>/dev/null | grep k3d || echo "")
     
     if [ -z "$CONTEXTS" ]; then
@@ -123,7 +108,6 @@ clean_kubeconfig() {
         done
     fi
     
-    # Remove all k3d clusters from kubeconfig
     CLUSTERS=$(kubectl config get-clusters 2>/dev/null | grep k3d || echo "")
     
     if [ ! -z "$CLUSTERS" ]; then
@@ -133,7 +117,6 @@ clean_kubeconfig() {
         done
     fi
     
-    # Remove all k3d users from kubeconfig
     USERS=$(kubectl config view -o jsonpath='{.users[*].name}' 2>/dev/null | tr ' ' '\n' | grep k3d || echo "")
     
     if [ ! -z "$USERS" ]; then
@@ -145,7 +128,6 @@ clean_kubeconfig() {
 }
 
 
-# Clean temporary files
 clean_temp_files() {
     print_status "Cleaning temporary files..."
     
@@ -156,14 +138,12 @@ clean_temp_files() {
     print_status "Temporary files cleaned"
 }
 
-# Prune Docker system
 prune_docker() {
     print_status "Pruning Docker system..."
     
     docker system prune -af --volumes 2>/dev/null || print_warning "Docker prune failed"
 }
 
-# Verify cleanup
 verify_cleanup() {
     echo ""
     print_status "Verifying cleanup..."
@@ -197,7 +177,6 @@ verify_cleanup() {
     ps aux | grep "kubectl port-forward" | grep -v grep || print_status "No port-forward processes found ✓"
 }
 
-# Print summary
 print_summary() {
     echo ""
     echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
@@ -211,7 +190,6 @@ print_summary() {
     echo ""
 }
 
-# Main execution
 main() {
     echo -e "${GREEN}"
     echo "╔════════════════════════════════════════════════════════════╗"
@@ -243,57 +221,45 @@ main() {
     print_status "Starting complete system reset..."
     echo ""
     
-    # Phase 1: Stop processes
     print_status "=== Phase 1: Stopping Processes ==="
     kill_kubectl_processes
     echo ""
     
-    # Phase 4: Delete clusters
     print_status "=== Phase 3: Deleting K3d Clusters ==="
     delete_all_k3d_clusters
     echo ""
     
-    # Phase 5: Clean containers
     print_status "=== Phase 4: Cleaning Docker Containers ==="
     clean_k3d_containers
     echo ""
     
-    # Phase 6: Clean networks
     print_status "=== Phase 5: Cleaning Docker Networks ==="
     clean_docker_networks
     echo ""
     
-    # Phase 7: Clean volumes
     print_status "=== Phase 6: Cleaning Docker Volumes ==="
     clean_docker_volumes
     echo ""
     
-    # Phase 8: Clean images
     print_status "=== Phase 7: Cleaning Docker Images ==="
     clean_k3d_images
     echo ""
     
-    # Phase 9: Clean kubeconfig
     print_status "=== Phase 8: Cleaning Kubeconfig ==="
     clean_kubeconfig
     echo ""
     
-    # Phase 10: Clean temp files
     print_status "=== Phase 9: Cleaning Temporary Files ==="
     clean_temp_files
     echo ""
     
-    # Phase 11: Docker prune
     print_status "=== Phase 10: Pruning Docker System ==="
     prune_docker
     echo ""
     
-    # Verify cleanup
     verify_cleanup
     
-    # Print summary
     print_summary
 }
 
-# Run main function
 main

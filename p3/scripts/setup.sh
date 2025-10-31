@@ -8,11 +8,11 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 CLUSTER_NAME="iot-cluster"
-ARGOCD_APP_FILE="../confs/argocd-application.yaml"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ARGOCD_APP_FILE="${SCRIPT_DIR}/../confs/argocd-application.yaml"
 
 echo -e "${GREEN}=== Setting up K3d Cluster with ArgoCD ===${NC}\n"
 
-# Check if necessary apps are installed
 for cmd in docker kubectl k3d; do
     if ! command -v $cmd &> /dev/null; then
         echo -e "${RED}Error: $cmd not installed. Run ./init.sh first${NC}"
@@ -20,28 +20,22 @@ for cmd in docker kubectl k3d; do
     fi
 done
 
-# Create cluster
 echo -e "${GREEN}[1/6]${NC} Creating cluster: $CLUSTER_NAME"
 k3d cluster create $CLUSTER_NAME
 
-# Wait for nodes
 echo -e "${GREEN}[2/6]${NC} Waiting for nodes..."
 kubectl wait --for=condition=ready nodes --all --timeout=300s
 
-# Create namespaces
 echo -e "${GREEN}[3/6]${NC} Creating namespaces..."
 kubectl create namespace argocd
 kubectl create namespace dev
 
-# Install ArgoCD
 echo -e "${GREEN}[4/6]${NC} Installing ArgoCD..."
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-# Wait for ArgoCD
 echo -e "${GREEN}[5/6]${NC} Waiting for ArgoCD to be ready..."
 kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd 2>/dev/null || sleep 30
 
-# Apply ArgoCD application config
 echo -e "${GREEN}[6/6]${NC} Applying ArgoCD application..."
 if [ -f "$ARGOCD_APP_FILE" ]; then
     kubectl apply -f "$ARGOCD_APP_FILE"

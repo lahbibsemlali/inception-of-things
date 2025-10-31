@@ -1,21 +1,14 @@
-#!/bin/bash
 set -euo pipefail
 
-# Configuration
 readonly ARGOCD_NAMESPACE="argocd"
 readonly PORT_FORWARD_PORT="8080"
 
-# Colors
 readonly GREEN="\033[32m"
 readonly RED="\033[31m"
 readonly YELLOW="\033[33m"
 readonly BLUE="\033[34m"
 readonly CYAN="\033[36m"
 readonly RESET="\033[0m"
-
-# ============================================================================
-# Utility Functions
-# ============================================================================
 
 log_info() {
     echo -e "${BLUE}ℹ${RESET} $*"
@@ -32,10 +25,6 @@ log_error() {
 log_warning() {
     echo -e "${YELLOW}⚠${RESET} $*"
 }
-
-# ============================================================================
-# Feature Functions
-# ============================================================================
 
 show_logs() {
     echo -e "\n${CYAN}═══════════════════════════════════════════════════════════${RESET}"
@@ -88,7 +77,6 @@ show_password() {
     
     local password
     
-    # Try to get the initial admin password
     if kubectl get secret argocd-initial-admin-secret -n "$ARGOCD_NAMESPACE" &>/dev/null; then
         password=$(kubectl get secret argocd-initial-admin-secret \
             -n "$ARGOCD_NAMESPACE" \
@@ -119,7 +107,6 @@ run_port_forward() {
     
     log_info "Checking for existing port-forward processes..."
     
-    # Kill any existing port-forward processes
     if pkill -f "kubectl port-forward.*argocd-server" 2>/dev/null; then
         log_success "Killed existing port-forward process"
         sleep 1
@@ -127,7 +114,6 @@ run_port_forward() {
         log_info "No existing port-forward found"
     fi
     
-    # Check if service exists
     if ! kubectl get svc argocd-server -n "$ARGOCD_NAMESPACE" &>/dev/null; then
         log_error "Service argocd-server not found in namespace $ARGOCD_NAMESPACE"
         return 1
@@ -135,7 +121,6 @@ run_port_forward() {
     
     log_info "Starting port forwarding..."
     
-    # Start port forwarding in background
     kubectl port-forward svc/argocd-server \
         -n "$ARGOCD_NAMESPACE" \
         "${PORT_FORWARD_PORT}:443" \
@@ -290,10 +275,6 @@ install_argocd_cli() {
     fi
 }
 
-# ============================================================================
-# Menu System
-# ============================================================================
-
 show_menu() {
     echo -e "\n${BLUE}╔═══════════════════════════════════════════════════════════╗${RESET}"
     echo -e "${BLUE}║${RESET}           ${CYAN}ArgoCD Management Menu${RESET}                      ${BLUE}║${RESET}"
@@ -350,37 +331,28 @@ handle_choice() {
     esac
 }
 
-# ============================================================================
-# Main Execution
-# ============================================================================
-
 main() {
-    # Check if kubectl is available
     if ! command -v kubectl &>/dev/null; then
         log_error "kubectl not found. Please install kubectl first."
         exit 1
     fi
     
-    # Check cluster connectivity
     if ! kubectl cluster-info &>/dev/null; then
         log_error "Cannot connect to Kubernetes cluster. Is k3d running?"
         exit 1
     fi
     
-    # Check if ArgoCD is installed
     if ! kubectl get namespace "$ARGOCD_NAMESPACE" &>/dev/null; then
         log_error "ArgoCD namespace not found. Is ArgoCD installed?"
         log_info "To install ArgoCD: kubectl create namespace argocd && kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
         exit 1
     fi
     
-    # If argument provided, execute directly
     if [ $# -gt 0 ]; then
         handle_choice "$1"
         exit $?
     fi
     
-    # Interactive mode
     while true; do
         show_menu
         echo -ne "${CYAN}Enter your choice [0-8]:${RESET} "

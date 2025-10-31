@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: ingress
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web  # ← Fixed indentation!
+    traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   rules:
   - host: "app1.com"
@@ -27,7 +27,6 @@ spec:
               port:
                 number: 80
   
-  # Default backend (no host) - catches all other requests
   - http:
       paths:
         - path: "/"

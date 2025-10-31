@@ -1,23 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
-# Configuration
 readonly NAMESPACE="gitlab"
 readonly DOMAIN="k3d.gitlab.com"
 readonly GITLAB_HOST="gitlab.${DOMAIN}"
 readonly PORT_FORWARD_PORT="8181"
 
-# Colors
 readonly GREEN="\033[32m"
 readonly RED="\033[31m"
 readonly YELLOW="\033[33m"
 readonly BLUE="\033[34m"
 readonly CYAN="\033[36m"
 readonly RESET="\033[0m"
-
-# ============================================================================
-# Utility Functions
-# ============================================================================
 
 log_info() {
     echo -e "${BLUE}ℹ${RESET} $*"
@@ -30,10 +24,6 @@ log_success() {
 log_error() {
     echo -e "${RED}✗${RESET} $*" >&2
 }
-
-# ============================================================================
-# Feature Functions
-# ============================================================================
 
 show_logs() {
     echo -e "\n${CYAN}═══════════════════════════════════════════════════════════${RESET}"
@@ -80,7 +70,6 @@ run_port_forward() {
     
     log_info "Checking for existing port-forward processes..."
     
-    # Kill any existing port-forward processes
     if pkill -f "kubectl port-forward.*gitlab-webservice" 2>/dev/null; then
         log_success "Killed existing port-forward process"
         sleep 1
@@ -88,7 +77,6 @@ run_port_forward() {
         log_info "No existing port-forward found"
     fi
     
-    # Check if service exists
     if ! kubectl get svc gitlab-webservice-default -n "$NAMESPACE" &>/dev/null; then
         log_error "Service gitlab-webservice-default not found in namespace $NAMESPACE"
         return 1
@@ -96,7 +84,6 @@ run_port_forward() {
     
     log_info "Starting port forwarding..."
     
-    # Start port forwarding in background
     kubectl port-forward svc/gitlab-webservice-default \
         -n "$NAMESPACE" \
         "${PORT_FORWARD_PORT}:8181" \
@@ -120,10 +107,6 @@ run_port_forward() {
         return 1
     fi
 }
-
-# ============================================================================
-# Menu System
-# ============================================================================
 
 show_menu() {
     echo -e "\n${BLUE}╔═══════════════════════════════════════════════════════════╗${RESET}"
@@ -165,30 +148,22 @@ handle_choice() {
     esac
 }
 
-# ============================================================================
-# Main Execution
-# ============================================================================
-
 main() {
-    # Check if kubectl is available
     if ! command -v kubectl &>/dev/null; then
         log_error "kubectl not found. Please install kubectl first."
         exit 1
     fi
     
-    # Check cluster connectivity
     if ! kubectl cluster-info &>/dev/null; then
         log_error "Cannot connect to Kubernetes cluster. Is k3d running?"
         exit 1
     fi
     
-    # If argument provided, execute directly
     if [ $# -gt 0 ]; then
         handle_choice "$1"
         exit $?
     fi
     
-    # Interactive mode
     while true; do
         show_menu
         echo -ne "${CYAN}Enter your choice [0-4]:${RESET} "
